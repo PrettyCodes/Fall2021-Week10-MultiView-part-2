@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiview Exercise</title>
+    <script src="scatter_plot.js"></script>
+    <script src="bar_plot.js"></script>
+    <script src="../lib/d3.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.js"></script>
+    <style>
+        div {
+            font-size: 14pt;
+        }
+        
+        .legend {
+            text-anchor: middle;
+            font-size: 22pt;
+        }
+        
+        .fig {
+            fill: #faf8f8;
+        }
+        
+        #main-container {
+            padding-top: 50px;
+        }
+        
+        #manipulation {
+            text-align: center;
+            font-size: 25px;
+        }
+        /* #top-left,
+        #top-center,
+        #top-right {
+            width: 500px;
+            height: 150px;
+        }
+        
+        #right-left,
+        #right-center,
+        #right-right {
+            width: 150px;
+            height: 500px;
+        } */
+    </style>
+    <link rel="stylesheet" href="../styles/style.css">
+</head>
+
+<body>
+    <h1 class='display-4 text-center'>Multiview</h1>
+    <table>
+        <tr>
+            <td><svg width="500px" height="150px" id='top-left'></svg></td>
+            <td>&nbsp</td>
+            <td><svg width="500px" height="150px" id='top-center'></svg></td>
+            <td>&nbsp</td>
+            <td><svg width="500px" height="150px" id='top-right'></svg></td>
+            <td>&nbsp</td>
+        </tr>
+        <tr>
+            <td><svg viewBox="0 0 1000 1000" id='main-left'></svg></td>
+            <td><svg width="150px" height="500px" id='right-left'></svg></td>
+            <td><svg viewBox="0 0 1000 1000" id='main-center'></svg></td>
+            <td><svg width="150px" height="500px" id='right-center'></svg></td>
+            <td><svg viewBox="0 0 1000 1000" id='main-right'></svg></td>
+            <td><svg width="150px" height="500px" id='right-right'></svg></td>
+        </tr>
+    </table>
+    <div class='container' id='main-container'>
+        <div class='row'>
+            <label id='manipulation' class='form-label'><b>Manipulation</b></label>
+            <div class="col">
+                <label for='gender' class='form-label'><b>Gender:</b></label>
+                <div class='container'>
+                    <input for='gender' class="form-check-input" type='radio' name='genderValue' id="MALE" value='MALE'>
+                    <label for="MALE" class="form-check-label">Male</label>
+                </div>
+                <div class='container'>
+                    <input for='gender' class="form-check-input" type='radio' name='genderValue' id="FEMALE" value='FEMALE'>
+                    <label for="FEMALE" class="form-check-label">Female</label>
+                </div>
+                <div class='container'>
+                    <input for='gender' class="form-check-input" type='radio' name='genderValue' id="BOTH" value='BOTH'>
+                    <label for="BOTH" class="form-check-label">Both</label>
+                </div>
+            </div>
+            <div class="col">
+                <label for='flipper_length' class="form-label"><b>Maximum Flipper length:</b></label>
+                <input type="range" id="flipper-slider" class="form-range" min="0" max="1000" step="1" />
+                <label id="max-flipper-label">Value: </label><label id="max-flipper"></label>
+            </div>
+            <div class="col"></div>
+        </div>
+    </div>
+    <script>
+        //d3 plots
+        let palmer_penguin_species = "../data/palmer_penguin_species.tsv";
+        d3.tsv(palmer_penguin_species, d => {
+            return {
+                species: d.species,
+                island: d.island,
+                body_mass_g: +d.body_mass_g,
+                culmen_depth_mm: +d.culmen_depth_mm,
+                culmen_length_mm: +d.culmen_length_mm,
+                flipper_length_mm: +d.flipper_length_mm,
+                gender: d.gender
+            }
+        }).then(main)
+
+        function main(data) {
+            // get flipper min and max for the slider
+            flipper_length_range = d3.extent(d3.map(data, d => {
+                return d.flipper_length_mm
+            }));
+
+            // set min and max on slider, and set max as the default
+            flipper_min = document.getElementById('flipper-slider').min = flipper_length_range[0]
+            flipper_max = document.getElementById('flipper-slider').max = flipper_length_range[1]
+            flipper_length = document.getElementById('flipper-slider').value = flipper_length_range[1]
+            document.getElementById('max-flipper').innerHTML = flipper_length_range[1]
+
+            // get gender from the radio button
+            gender = $("input[type='radio'][name='genderValue']:checked").val()
+
+            // run the main plot function with default options
+            plot(data, flipper_length, gender)
+
+            // interacting with the slider
+            document.getElementById('flipper-slider').oninput = function() {
+                flipper_length = document.getElementById('flipper-slider').value
+                document.getElementById('max-flipper').innerHTML = flipper_length
+                plot(data, flipper_length, gender)
+            }
+
+            // interacting with the gender radio
+            $("input[type='radio'][name='genderValue']").change(function() {
+                gender = $("input[type='radio'][name='genderValue']:checked").val()
+                plot(data, flipper_length, gender)
+            })
+        }
+
+        // the plotting function
+        // this will be run again upon manipulation on the main screen
+        function plot(data, flipperMax, selectedGender) {
+            // species list; array from set
+            species_list = [...new Set(d3.map(data, function(d) {
+                return d.species
+            }))]
+
+            // filter data according to the parameters
+            //flipper length
+            data = d3.filter(data, d => {
+                if (d.flipper_length_mm <= flipperMax) {
+                    return d
+                }
+            });
+            // gender
+            if (selectedGender != "BOTH") {
+                data = d3.filter(data, d => {
+                    if (d.gender == selectedGender) {
+                        return d
+                    }
+                })
+            }
+            // console.log(data)
+
+            // filtering data for each species
+            Adelie_data = d3.filter(data, d => {
+                if (d.species == "Adelie") {
+                    return d
+                }
+            })
+            Gentoo_data = d3.filter(data, d => {
+                if (d.species == "Gentoo") {
+                    return d
+                }
+            })
+            Chinstrap_data = d3.filter(data, d => {
+                if (d.species == "Chinstrap") {
+                    return d
+                }
+            })
+
+            // create an array of all the speciedata
+            allData = [Adelie_data, Gentoo_data, Chinstrap_data]
+            topSlots = ['top-left', 'top-center', 'top-right'] // svg ids
+            mainSlots = ['main-left', 'main-center', 'main-right'] // svg ids
+            rightSlots = ['right-left', 'right-center', 'right-right'] // svg ids
+
+            // loop over all specie data to create scatter plots
+            for ([index, species_data] of allData.entries()) {
+                let islands = d3.map(data, function(d) {
+                    return d.island
+                })
+
+                // for legends
+                let island_types = [...new Set(islands)]
+
+                // for color
+                let insland_code = d3.map(species_data, d => {
+                    islands = d.island
+                    if (islands === "Torgersen") {
+                        return 0
+                    } else if (islands === "Biscoe") {
+                        return 1
+                    } else {
+                        return 2
+                    }
+                })
+
+                let culmen_length_mm = d3.map(species_data, function(d) {
+                    return +d.culmen_length_mm
+                })
+                let culmen_depth_mm = d3.map(species_data, function(d) {
+                    return +d.culmen_depth_mm
+                })
+                let flipper_length_mm = d3.map(species_data, function(d) {
+                    return +d.flipper_length_mm
+                })
+
+                scatter_plot(culmen_length_mm,
+                    culmen_depth_mm,
+                    flipper_length_mm,
+                    insland_code,
+                    mainSlots[index],
+                    title = species_list[index],
+                    legend = island_types,
+                    xLabel = "culmen_length_mm",
+                    yLabel = "culmen_depth_mm"
+                )
+                bar_plot(culmen_length_mm, 10, topSlots[index])
+                h_bar_plot(culmen_depth_mm, 10, rightSlots[index])
+            }
+        }
+    </script>
+</body>
+
+</html>
