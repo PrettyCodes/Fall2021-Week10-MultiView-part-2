@@ -16,6 +16,16 @@
             font-size: 14pt;
         }
         
+        h1 {
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .fig-table {
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
         .legend {
             text-anchor: middle;
             font-size: 22pt;
@@ -32,6 +42,11 @@
         #manipulation {
             text-align: center;
             font-size: 25px;
+            margin: 0px;
+        }
+        
+        #main-container {
+            padding-bottom: 20px;
         }
         /* #top-left,
         #top-center,
@@ -51,8 +66,8 @@
 </head>
 
 <body>
-    <h1 class='display-4 text-center'>Multiview</h1>
-    <table>
+    <h1 class='display-6 text-center border-bottom border-danger border-3'>Penguin species multiview Visualization</h1>
+    <table class='fig-table'>
         <tr>
             <td><svg width="500px" height="150px" id='top-left'></svg></td>
             <td>&nbsp</td>
@@ -71,8 +86,9 @@
         </tr>
     </table>
     <div class='container' id='main-container'>
-        <div class='row'>
-            <label id='manipulation' class='form-label'><b>Manipulation</b></label>
+        <div class='row border border-info rounded border-2'>
+            <label id='manipulation' class='form-label '><b>Manipulation</b></label></div>
+        <div class='row border border-info rounded border-2 align-items-center'>
             <div class="col">
                 <label for='gender' class='form-label'><b>Gender:</b></label>
                 <div class='container'>
@@ -88,12 +104,16 @@
                     <label for="BOTH" class="form-check-label">Both</label>
                 </div>
             </div>
-            <div class="col">
-                <label for='flipper_length' class="form-label"><b>Maximum Flipper length:</b></label>
+            <div class="col border-end border-start border-info border-2 ">
+                <label class="form-label"><b>Maximum Flipper length:</b></label>
                 <input type="range" id="flipper-slider" class="form-range" min="0" max="1000" step="1" />
                 <label id="max-flipper-label">Value: </label><label id="max-flipper"></label>
             </div>
-            <div class="col"></div>
+            <div class="col">
+                <label for='body_mass' class="form-label"><b>Minimum Body Mass:</b></label>
+                <input type="range" id="mass-slider" class="form-range" min="0" max="1000" step="1" />
+                <label id="min-body-mass-label">Value: </label><label id="min-body-mass"></label>
+            </div>
         </div>
     </div>
     <script>
@@ -117,55 +137,79 @@
                 return d.flipper_length_mm
             }));
 
-            // set min and max on slider, and set max as the default
+            body_mass_range = d3.extent(d3.map(data, d => {
+                return d.body_mass_g
+            }));
+            console.log(body_mass_range)
+
+            // set min and max on body mass slider, and set min as the default
+            body_mass_min = document.getElementById('mass-slider').min = body_mass_range[0]
+            body_mass_max = document.getElementById('mass-slider').max = body_mass_range[1]
+            body_mass = document.getElementById('mass-slider').value = body_mass_min
+            document.getElementById('min-body-mass').innerHTML = body_mass_min
+
+            // set min and max on flipper length slider, and set max as the default
             flipper_min = document.getElementById('flipper-slider').min = flipper_length_range[0]
             flipper_max = document.getElementById('flipper-slider').max = flipper_length_range[1]
-            flipper_length = document.getElementById('flipper-slider').value = flipper_length_range[1]
-            document.getElementById('max-flipper').innerHTML = flipper_length_range[1]
+            flipper_length = document.getElementById('flipper-slider').value = flipper_max
+            document.getElementById('max-flipper').innerHTML = flipper_max
 
             // get gender from the radio button
             gender = $("input[type='radio'][name='genderValue']:checked").val()
 
             // run the main plot function with default options
-            plot(data, flipper_length, gender)
+            plot(data, flipper_length, gender, body_mass)
 
-            // interacting with the slider
+            // interacting with the flipper length slider
             document.getElementById('flipper-slider').oninput = function() {
                 flipper_length = document.getElementById('flipper-slider').value
                 document.getElementById('max-flipper').innerHTML = flipper_length
-                plot(data, flipper_length, gender)
+                plot(data, flipper_length, gender, body_mass)
+            }
+
+            // interacting with the bodymass slider
+            document.getElementById('mass-slider').oninput = function() {
+                body_mass = document.getElementById('mass-slider').value
+                document.getElementById('min-body-mass').innerHTML = body_mass
+                plot(data, flipper_length, gender, body_mass)
             }
 
             // interacting with the gender radio
             $("input[type='radio'][name='genderValue']").change(function() {
                 gender = $("input[type='radio'][name='genderValue']:checked").val()
-                plot(data, flipper_length, gender)
+                plot(data, flipper_length, gender, body_mass)
             })
         }
 
         // the plotting function
         // this will be run again upon manipulation on the main screen
-        function plot(data, flipperMax, selectedGender) {
+        function plot(data, flipperMax, selectedGender, bodyMassMin) {
             // species list; array from set
             species_list = [...new Set(d3.map(data, function(d) {
                 return d.species
             }))]
 
             // filter data according to the parameters
-            //flipper length
+            // 1. flipper length
             data = d3.filter(data, d => {
                 if (d.flipper_length_mm <= flipperMax) {
                     return d
                 }
             });
-            // gender
+            // 2. gender
             if (selectedGender != "BOTH") {
                 data = d3.filter(data, d => {
                     if (d.gender == selectedGender) {
                         return d
                     }
                 })
-            }
+            };
+            // 3. body mass
+            data = d3.filter(data, d => {
+                if (d.body_mass_g >= bodyMassMin) {
+                    return d
+                }
+            });
             // console.log(data)
 
             // filtering data for each species
